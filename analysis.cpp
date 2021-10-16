@@ -103,7 +103,7 @@ Analysis::CAM_PARAMS Analysis::getNewParams(cv::Mat image, esenetcam_unsigned_lo
 {
   cv::Mat hist = getHist(image);
   showHist(hist);
-  double metric = firstMoment(hist);
+  double metric = thirdMoment(hist);
   std::cout << "metric = " << metric << std::endl;
   std::cout << "f_gain = " << f_gain(metric) << std::endl;
   std::cout << "f_shutter = " << f_shutter(metric) << std::endl;

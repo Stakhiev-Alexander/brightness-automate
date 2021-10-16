@@ -10,5 +10,5 @@ include_directories( ${OpenCV_INCLUDE_DIRS} )
 
 find_library(ESENetCam_LIBRARY libESENetCam.so HINTS /usr/lib/)
 
-add_executable (Main main.cpp cameradatamanager.cpp cameradatamanager.h analysis.cpp analysis.hpp)      
+add_executable (Main main.cpp cameradatamanager.cpp cameradatamanager.hpp analysis.cpp analysis.hpp)      
 target_link_libraries(Main ${ESENetCam_LIBRARY} ${OpenCV_LIBS}) 

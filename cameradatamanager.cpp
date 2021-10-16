@@ -1,7 +1,5 @@
 #include "cameradatamanager.hpp"
 
-#include <typeinfo>
-
 namespace
 {
   void cameraCallback(const char *szCameraName, int pEventID, int pEventDataSize,
@@ -90,7 +88,7 @@ void CameraDataManager::updateCameraCapabilities()
     }
   }
 
-  analysis_ = new Analysis(currentCameraParam_);
+  analysis_.reset(new Analysis(currentCameraParam_));
 }
 
 esenetcam_unsigned_long_t
@@ -249,34 +247,19 @@ void CameraDataManager::processNewFrame()
       break;
       }
 
-      // Analyse here!
       cv::Mat image(height, width, CV_8UC1, pDirectImageData);
       cv::resize(image, image, cv::Size(), 0.25, 0.25);
       cv::imshow("Main", image);
       char c = (char)cv::waitKey(1);
 
+      // Analyse here!
       Analysis::CAM_PARAMS newParams = analysis_->getNewParams(image, curShutter, curGain);
 
       setCameraFeature(GAIN, newParams.gain);
       setCameraFeature(SHUTTER, newParams.shutter);
-
-      // for (auto& fObserver : frameObservers_) {
-      //   fObserver->processNewFrame();
-      // }
     }
   }
   catch (...)
   {
-  }
-}
-
-void CameraDataManager::addNewFrameObserver(INewFrameObserver *frameObserver)
-{
-  if (frameObserver)
-  {
-    if (std::find(frameObservers_.begin(), frameObservers_.end(), frameObserver) == frameObservers_.end())
-    {
-      frameObservers_.push_back(frameObserver);
-    }
   }
 }

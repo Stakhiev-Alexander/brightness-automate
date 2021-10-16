@@ -14,30 +14,6 @@
 #include "analysis.hpp"
 #include "esenetcam.h"
 
-class INewFrameObserver
-{
-public:
-  virtual void processNewFrame() = 0;
-};
-
-class AnalyserObserver : public INewFrameObserver
-{
-private:
-  std::mutex analyserProcessedMutex_;
-  bool analyseProcessed_ = true;
-
-public:
-  void processNewFrame() override
-  {
-    std::lock_guard oLock(analyserProcessedMutex_);
-    if (analyseProcessed_)
-    {
-      analyseProcessed_ = false;
-      std::cout << "analyseProcessed" << std::endl;
-    }
-  }
-};
-
 class CameraDataManager
 {
 public:
@@ -50,16 +26,19 @@ private:
   ~CameraDataManager();
 
   std::string currentCameraName_;
+  std::vector<std::string> camNames_;
+
   NET_CAMERA_CAPABILITES currentCameraParam_ = {};
   DIRECT_BUFFER_ARRAY camBuffers_ = {};
   std::vector<std::unique_ptr<unsigned char[]>> realBuffers_;
   unsigned char *pCurrentBuffer_ = nullptr;
-  service_data_t serviceData_;
+
+  service_data_t serviceData_; // type of current image header
+
   bool streamWorked_ = false;
   std::mutex frameProcessingMutex_;
-  std::vector<std::string> camNames_;
-  std::deque<INewFrameObserver *> frameObservers_;
-  Analysis *analysis_;
+
+  std::unique_ptr<Analysis> analysis_;
 
 public:
   static CameraDataManager &GetInstance();
@@ -80,8 +59,6 @@ public:
   void stopVideoStreamOnError();
   void checkFrameProcessingIsFinished();
   void processNewFrame();
-
-  void addNewFrameObserver(INewFrameObserver *frameObserver);
 };
 
 #define CamDM CameraDataManager::GetInstance()

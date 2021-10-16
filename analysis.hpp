@@ -21,9 +21,7 @@ public:
   };
 
   cv::Mat getHistImage(const cv::Mat &histogram);
-
   cv::Mat getHist(const cv::Mat &image);
-
   void showHist(const cv::Mat &hist);
 
   CAM_PARAMS getNewParams(cv::Mat image, esenetcam_unsigned_long_t currShutter, esenetcam_unsigned_long_t currGain);
