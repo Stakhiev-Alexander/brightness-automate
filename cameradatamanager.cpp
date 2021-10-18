@@ -66,6 +66,11 @@ const std::string &CameraDataManager::getCurrentCameraName() const
   return currentCameraName_;
 }
 
+const NET_CAMERA_CAPABILITES &CameraDataManager::getCurrentCameraParams() const
+{
+  return currentCameraParam_;
+}
+
 void CameraDataManager::setCurrentCameraName(std::string newCameraName)
 {
   currentCameraName_ = newCameraName;
@@ -248,15 +253,15 @@ void CameraDataManager::processNewFrame()
       }
 
       cv::Mat image(height, width, CV_8UC1, pDirectImageData);
-      cv::resize(image, image, cv::Size(), 0.25, 0.25);
-      cv::imshow("Main", image);
-      char c = (char)cv::waitKey(1);
 
       // Analyse here!
       Analysis::CAM_PARAMS newParams = analysis_->getNewParams(image, curShutter, curGain);
 
       setCameraFeature(GAIN, newParams.gain);
       setCameraFeature(SHUTTER, newParams.shutter);
+      cv::resize(image, image, cv::Size(), 0.25, 0.25);
+      cv::imshow("Main", image);
+      char c = (char)cv::waitKey(1);
     }
   }
   catch (...)

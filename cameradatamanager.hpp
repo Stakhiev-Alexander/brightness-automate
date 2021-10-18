@@ -45,6 +45,7 @@ public:
 
   void loadCamerasList();
   const std::string &getCurrentCameraName() const;
+  const NET_CAMERA_CAPABILITES &getCurrentCameraParams() const;
   void setCurrentCameraName(std::string newCameraName);
   void updateCameraCapabilities();
 

@@ -12,6 +12,7 @@ int main()
 
   camDM.loadCamerasList();
   camDM.setCurrentCameraName("192.168.1.34");
+  camDM.setCameraFeature(SHUTTER, camDM.getCurrentCameraParams().Shutter.MaxValue);
   std::cout << camDM.getCurrentCameraName() << std::endl;
 
   camDM.startVideoStream();

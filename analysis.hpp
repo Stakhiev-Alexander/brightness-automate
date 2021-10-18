@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <cmath>
+#include <algorithm>
 #include <opencv2/opencv.hpp>
 
 #include "esenetcam.h"
@@ -30,6 +31,9 @@ private:
   NET_CAMERA_CAPABILITES currentCameraParam_;
   float firstMoment(const cv::Mat &hist);
   float thirdMoment(const cv::Mat &hist);
+  float edgeEqualization(const cv::Mat &hist);
+  esenetcam_unsigned_long_t f_shutter_ee(float metric);
+  esenetcam_unsigned_long_t f_gain_ee(float metric);
   esenetcam_unsigned_long_t f_shutter(double metric);
   esenetcam_unsigned_long_t f_gain(double metric);
 };

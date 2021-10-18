@@ -52,34 +52,94 @@ void Analysis::showHist(const cv::Mat &hist)
 
 float Analysis::firstMoment(const cv::Mat &hist)
 {
-  double desired_balance = 0.5;
   double sum = 0.0;
-  int total_pix = cv::sum(hist)[0];
-  hist /= total_pix;
+  int totalPix = cv::sum(hist)[0];
+  hist /= totalPix;
   for (int i = 0; i < hist.rows; i++)
   {
     sum += (i - 128) / 128.0 * hist.at<float>(i);
   }
   return sum;
-};
+}
 
 float Analysis::thirdMoment(const cv::Mat &hist)
 {
-  double desired_balance = 0.5;
   double sum = 0.0;
-  int total_pix = cv::sum(hist)[0];
-  hist /= total_pix;
+  int totalPix = cv::sum(hist)[0];
+  hist /= totalPix;
   for (int i = 0; i < hist.rows; i++)
   {
     sum += std::pow((i - 128) / 128.0, 3) * hist.at<float>(i);
   }
   return sum;
+}
 
-  // sum /= hist.rows;
-  // float light_required = desired_balance / balance;
-  // light_required = std::min(light_required, 5.0f);
-  // return light_required;
-};
+float Analysis::edgeEqualization(const cv::Mat &hist)
+{
+  float totalPix = cv::sum(hist)[0];
+  float edgePixDiff = (hist.at<float>(255) - hist.at<float>(0)) / totalPix;
+
+  // if one edge of the histogram is bigger than other within a threshold
+  const float EDGE_PIX_DIFF_THRESHOLD = 0.001;
+  if (abs(edgePixDiff) > EDGE_PIX_DIFF_THRESHOLD)
+  {
+    return edgePixDiff;
+  }
+
+  // count number of unused bins in the histogram from the left side
+  const int UNUSED_BIN_THRESHOLD = 1000;
+  int zerosLeft = 0;
+  for (int i = 0; i < hist.rows; i++)
+  {
+    if (hist.at<float>(i) < UNUSED_BIN_THRESHOLD)
+    {
+      zerosLeft++;
+    }
+    else
+      break;
+  }
+
+  // count number of unused bins in the histogram from the right side
+  int zerosRight = 0;
+  for (int i = hist.rows; i > 0; i--)
+  {
+    if (hist.at<float>(i) < UNUSED_BIN_THRESHOLD)
+    {
+      zerosRight++;
+    }
+    else
+      break;
+  }
+
+  // if one end is empty, move the histogram there
+  const int UNUSED_NUMBER_OF_BINS_THRESHOLD = 3;
+  if (abs(zerosLeft - zerosRight) > UNUSED_NUMBER_OF_BINS_THRESHOLD)
+  {
+    return (zerosLeft - zerosRight);
+  }
+  else
+  {
+    return 0.0;
+  }
+}
+
+esenetcam_unsigned_long_t Analysis::f_shutter_ee(float metric)
+{
+  if (abs(metric) > 0.0001)
+  {
+    return 20;
+  }
+  return 0;
+}
+
+esenetcam_unsigned_long_t Analysis::f_gain_ee(float metric)
+{
+  if (abs(metric) > 0.0001)
+  {
+    return 1;
+  }
+  return 0;
+}
 
 esenetcam_unsigned_long_t Analysis::f_shutter(double metric)
 {
@@ -103,35 +163,33 @@ Analysis::CAM_PARAMS Analysis::getNewParams(cv::Mat image, esenetcam_unsigned_lo
 {
   cv::Mat hist = getHist(image);
   showHist(hist);
-  double metric = thirdMoment(hist);
+  float metric = edgeEqualization(hist);
   std::cout << "metric = " << metric << std::endl;
-  std::cout << "f_gain = " << f_gain(metric) << std::endl;
-  std::cout << "f_shutter = " << f_shutter(metric) << std::endl;
-  std::cout << "currShutter = " << currShutter << std::endl;
-  std::cout << "currGain = " << currGain << std::endl;
+  // std::cout << "f_gain = " << f_gain_ee(metric) << std::endl;
+  // std::cout << "f_shutter = " << f_shutter_ee(metric) << std::endl;
 
   CAM_PARAMS camParams = {currShutter, currGain};
 
   if (metric > 0.0)
   {
-    if (currGain - f_gain(metric) > currentCameraParam_.Gain.MinValue)
+    if (currGain - f_gain_ee(metric) > currentCameraParam_.Gain.MinValue)
     {
-      camParams.gain = currGain - f_gain(metric);
+      camParams.gain = currGain - f_gain_ee(metric);
     }
-    else if (currShutter - f_shutter(metric) > currentCameraParam_.Shutter.MinValue)
+    else if (currShutter - f_shutter_ee(metric) > currentCameraParam_.Shutter.MinValue)
     {
-      camParams.shutter = currShutter - f_shutter(metric);
+      camParams.shutter = currShutter - f_shutter_ee(metric);
     }
   }
   else
   {
-    if (currShutter + f_shutter(metric) < currentCameraParam_.Shutter.MaxValue)
+    if (currShutter + f_shutter_ee(metric) < currentCameraParam_.Shutter.MaxValue)
     {
-      camParams.shutter = currShutter + f_shutter(metric);
+      camParams.shutter = currShutter + f_shutter_ee(metric);
     }
-    else if (currGain + f_gain(metric) < currentCameraParam_.Gain.MaxValue)
+    else if (currGain + f_gain_ee(metric) < currentCameraParam_.Gain.MaxValue)
     {
-      camParams.gain = currGain + f_gain(metric);
+      camParams.gain = currGain + f_gain_ee(metric);
     }
   }
   return camParams;
