@@ -73,7 +73,22 @@ const NET_CAMERA_CAPABILITES &CameraDataManager::getCurrentCameraParams() const
 
 void CameraDataManager::setCurrentCameraName(std::string newCameraName)
 {
+  if (currentCameraName_ == newCameraName)
+  {
+    return;
+  }
+  bool streamWasRun = isStreamWorked();
+  stopVideoStream();
+  if (std::find(camNames_.begin(),camNames_.end(), newCameraName) == camNames_.end())
+  {
+    return;
+  }
   currentCameraName_ = newCameraName;
+  updateCameraCapabilities();
+  if (streamWasRun)
+  {
+    startVideoStream();
+  }
 }
 
 void CameraDataManager::updateCameraCapabilities()
@@ -99,7 +114,7 @@ void CameraDataManager::updateCameraCapabilities()
 esenetcam_unsigned_long_t
 CameraDataManager::getCameraFeature(esenetcam_unsigned_long_t featureId)
 {
-  if (currentCameraName_.empty())
+  if (currentCameraName_.empty() || !isStreamWorked())
   {
     return 0;
   }
@@ -111,7 +126,7 @@ CameraDataManager::getCameraFeature(esenetcam_unsigned_long_t featureId)
 void CameraDataManager::setCameraFeature(esenetcam_unsigned_long_t featureId,
                                          esenetcam_unsigned_long_t featureVal)
 {
-  if (currentCameraName_.empty())
+  if (currentCameraName_.empty() || !isStreamWorked())
   {
     return;
   }
@@ -206,8 +221,9 @@ void CameraDataManager::processNewFrame()
       unsigned char *pDirectImageData = nullptr;
       unsigned short width = 0;
       unsigned short height = 0;
-      unsigned short curGain = 0;
-      esenetcam_unsigned_long_t curShutter = 0;
+      unsigned short currGain = 0;
+      esenetcam_unsigned_long_t currShutter = 0;
+      unsigned char currGamma = 0;
 
       if ((rRetHeader.ulNextDataSize == 0))
       {
@@ -229,8 +245,9 @@ void CameraDataManager::processNewFrame()
 
         width = sServDataItk4.usWidth;
         height = sServDataItk4.usHeight;
-        curGain = sServDataItk4.usCurrGain;
-        curShutter = sServDataItk4.ulCurrShutter;
+        currGain = sServDataItk4.usCurrGain;
+        currShutter = sServDataItk4.ulCurrShutter;
+        currGamma = sServDataItk4.chCurrGamma;
       }
       break;
       case 2:
@@ -246,8 +263,9 @@ void CameraDataManager::processNewFrame()
 
         width = sServDataType2.ulWidth;
         height = sServDataType2.ulHeight;
-        curGain = sServDataType2.ulCurrGain;
-        curShutter = sServDataType2.ulCurrShutter;
+        currGain = sServDataType2.ulCurrGain;
+        currShutter = sServDataType2.ulCurrShutter;
+        currGamma = sServDataType2.chCurrGamma;
       }
       break;
       }
@@ -255,10 +273,14 @@ void CameraDataManager::processNewFrame()
       cv::Mat image(height, width, CV_8UC1, pDirectImageData);
 
       // Analyse here!
-      Analysis::CAM_PARAMS newParams = analysis_->getNewParams(image, curShutter, curGain);
+      Analysis::CAM_PARAMS newParams = analysis_->getNewParams(image, currShutter, currGain, currGamma);
 
       setCameraFeature(GAIN, newParams.gain);
       setCameraFeature(SHUTTER, newParams.shutter);
+      setCameraFeature(GAMMA, newParams.gamma);
+
+      // std::this_thread::sleep_for(std::chrono::milliseconds(50));
+      
       cv::resize(image, image, cv::Size(), 0.25, 0.25);
       cv::imshow("Main", image);
       char c = (char)cv::waitKey(1);

@@ -1,6 +1,4 @@
 #include "analysis.hpp"
-#include <iostream>
-#include <cmath>
 
 cv::Mat Analysis::getHistImage(const cv::Mat &histogram)
 {
@@ -74,20 +72,10 @@ float Analysis::thirdMoment(const cv::Mat &hist)
   return sum;
 }
 
-float Analysis::edgeEqualization(const cv::Mat &hist)
+int Analysis::unusedSidesDiff(const cv::Mat &hist)
 {
-  float totalPix = cv::sum(hist)[0];
-  float edgePixDiff = (hist.at<float>(255) - hist.at<float>(0)) / totalPix;
-
-  // if one edge of the histogram is bigger than other within a threshold
-  const float EDGE_PIX_DIFF_THRESHOLD = 0.001;
-  if (abs(edgePixDiff) > EDGE_PIX_DIFF_THRESHOLD)
-  {
-    return edgePixDiff;
-  }
-
   // count number of unused bins in the histogram from the left side
-  const int UNUSED_BIN_THRESHOLD = 1000;
+  const int UNUSED_BIN_THRESHOLD = 500;
   int zerosLeft = 0;
   for (int i = 0; i < hist.rows; i++)
   {
@@ -111,16 +99,12 @@ float Analysis::edgeEqualization(const cv::Mat &hist)
       break;
   }
 
-  // if one end is empty, move the histogram there
-  const int UNUSED_NUMBER_OF_BINS_THRESHOLD = 3;
-  if (abs(zerosLeft - zerosRight) > UNUSED_NUMBER_OF_BINS_THRESHOLD)
+  if ((zerosLeft > zerosRight && zerosLeft < 15) || (zerosLeft < zerosRight && zerosRight < 15))
   {
-    return (zerosLeft - zerosRight);
+    return 0;
   }
-  else
-  {
-    return 0.0;
-  }
+
+  return zerosLeft - zerosRight;
 }
 
 esenetcam_unsigned_long_t Analysis::f_shutter_ee(float metric)
@@ -159,37 +143,107 @@ esenetcam_unsigned_long_t Analysis::f_gain(double metric)
   return (esenetcam_unsigned_long_t)abs(metric * 50);
 }
 
-Analysis::CAM_PARAMS Analysis::getNewParams(cv::Mat image, esenetcam_unsigned_long_t currShutter, esenetcam_unsigned_long_t currGain)
+Analysis::CAM_PARAMS Analysis::getNewParams(cv::Mat image, esenetcam_unsigned_long_t currShutter, esenetcam_unsigned_long_t currGain, esenetcam_unsigned_long_t currGamma)
 {
+  // TODO: check if setParams actually set params before processing next frame
   cv::Mat hist = getHist(image);
   showHist(hist);
-  float metric = edgeEqualization(hist);
-  std::cout << "metric = " << metric << std::endl;
-  // std::cout << "f_gain = " << f_gain_ee(metric) << std::endl;
-  // std::cout << "f_shutter = " << f_shutter_ee(metric) << std::endl;
 
-  CAM_PARAMS camParams = {currShutter, currGain};
+  std::cout << "gain = " << currGain << std::endl;
+  std::cout << "shutter = " << currShutter << std::endl;
+  std::cout << "gamma = " << currGamma << std::endl;
+  std::cout << std::endl;
+
+  CAM_PARAMS camParams = {currShutter, currGain, currGamma};
+  float totalPix = cv::sum(hist)[0];
+  float edgePixDiff = (hist.at<float>(255) - hist.at<float>(0)) / totalPix;
+
+  // if one edge of the histogram is bigger than other within a threshold
+  const float EDGE_PIX_DIFF_THRESHOLD = 0.0025;
+  if (abs(edgePixDiff) > EDGE_PIX_DIFF_THRESHOLD)
+  {
+    std::cout << "in  EDGE_PIX_DIFF_THRESHOLD" << std::endl;
+    std::cout << "GainShutter" << std::endl;
+
+    return changeShutterOrGain(edgePixDiff, camParams);
+  }
+
+  int unusedSidesDiffRet = unusedSidesDiff(hist);
+  // if one end is empty, move the histogram there
+  const int UNUSED_NUMBER_OF_BINS_THRESHOLD = 25;
+  if (abs(unusedSidesDiffRet) > UNUSED_NUMBER_OF_BINS_THRESHOLD)
+  {
+    std::cout << "in  UNUSED_NUMBER_OF_BINS_THRESHOLD" << std::endl;
+    return changeShutterOrGain(unusedSidesDiffRet, camParams);
+  }
+
+  // float thridMomentRet = thirdMoment(hist);
+
+  // const float THIRD_MOMENT_THRESHOLD = 0.025;
+  // if (abs(thridMomentRet) > THIRD_MOMENT_THRESHOLD)
+  // {
+  //   std::cout << "in  THIRD_MOMENT_THRESHOLD" << std::endl;
+  //   std::cout << "GainShutter" << std::endl;
+  //   return changeShutterOrGain(thridMomentRet, camParams);
+  // }
+
+  // // gamma
+  // double min, max;
+  // int minLoc, maxLoc;
+  // cv::minMaxIdx(hist, &min, &max, &minLoc, &maxLoc);
+  // const int PEAK_CENTERED_THRESHOLD = 3;
+  // if (abs(maxLoc - 128) > PEAK_CENTERED_THRESHOLD)
+  // {
+  //   int diff = maxLoc - 128;
+  //   camParams.gamma = currGamma + (diff > 0 ? 1 : -1);
+  // }
+  // return camParams;
+
+  float thridMomentRet = thirdMoment(hist);
+
+  const float THIRD_MOMENT_THRESHOLD = 0.01;
+  if (abs(thridMomentRet) > 0.01)
+  {
+    std::cout << "in  THIRD_MOMENT_THRESHOLD" << std::endl;
+    std::cout << "Gamma" << std::endl;
+    if (camParams.gamma - 1 > currentMinMaxParams_.gamma.minValue && thridMomentRet < 0)
+    {
+      camParams.gamma -= 1;
+    }
+    else if (camParams.gamma + 1 < currentMinMaxParams_.gamma.maxValue && thridMomentRet > 0)
+    {
+      camParams.gamma += 1;
+    }
+  }
+
+  return camParams;
+}
+
+Analysis::CAM_PARAMS Analysis::changeShutterOrGain(float metric, CAM_PARAMS &camParams)
+{
+  // TODO: there are cases on edges then params dont change then they should
+  // example: gain && shutter && gamma == 0, so we have to make gamma higher but we end up in this method
 
   if (metric > 0.0)
   {
-    if (currGain - f_gain_ee(metric) > currentCameraParam_.Gain.MinValue)
+    if (camParams.gain - f_gain_ee(metric) > currentMinMaxParams_.gain.minValue)
     {
-      camParams.gain = currGain - f_gain_ee(metric);
+      camParams.gain -= f_gain_ee(metric);
     }
-    else if (currShutter - f_shutter_ee(metric) > currentCameraParam_.Shutter.MinValue)
+    else if (camParams.shutter - f_shutter_ee(metric) > currentMinMaxParams_.shutter.minValue)
     {
-      camParams.shutter = currShutter - f_shutter_ee(metric);
+      camParams.shutter -= f_shutter_ee(metric);
     }
   }
   else
   {
-    if (currShutter + f_shutter_ee(metric) < currentCameraParam_.Shutter.MaxValue)
+    if (camParams.shutter + f_shutter_ee(metric) < currentMinMaxParams_.shutter.maxValue)
     {
-      camParams.shutter = currShutter + f_shutter_ee(metric);
+      camParams.shutter += f_shutter_ee(metric);
     }
-    else if (currGain + f_gain_ee(metric) < currentCameraParam_.Gain.MaxValue)
+    else if (camParams.gain + f_gain_ee(metric) < currentMinMaxParams_.gain.maxValue)
     {
-      camParams.gain = currGain + f_gain_ee(metric);
+      camParams.gain += f_gain_ee(metric);
     }
   }
   return camParams;
