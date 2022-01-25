@@ -145,7 +145,6 @@ esenetcam_unsigned_long_t Analysis::f_gain(double metric)
 
 Analysis::CAM_PARAMS Analysis::getNewParams(cv::Mat image, esenetcam_unsigned_long_t currShutter, esenetcam_unsigned_long_t currGain, esenetcam_unsigned_long_t currGamma)
 {
-  // TODO: check if setParams actually set params before processing next frame
   cv::Mat hist = getHist(image);
   showHist(hist);
 

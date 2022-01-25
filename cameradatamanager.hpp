@@ -13,6 +13,7 @@
 
 #include "analysis.hpp"
 #include "esenetcam.h"
+#include "gradanalysis.hpp"
 
 class CameraDataManager
 {
@@ -28,10 +29,12 @@ private:
   std::string currentCameraName_;
   std::vector<std::string> camNames_;
 
-  NET_CAMERA_CAPABILITES currentCameraParam_ = {};
+  NET_CAMERA_CAPABILITES currentCameraCapabilites_ = {};
   DIRECT_BUFFER_ARRAY camBuffers_ = {};
   std::vector<std::unique_ptr<unsigned char[]>> realBuffers_;
   unsigned char *pCurrentBuffer_ = nullptr;
+  Analysis::CAM_PARAMS currentCameraParams_ = {0, 0, 0};
+  short notAppliedCounter_ = 0;
 
   service_data_t serviceData_; // type of current image header
 
@@ -39,6 +42,7 @@ private:
   std::mutex frameProcessingMutex_;
 
   std::unique_ptr<Analysis> analysis_;
+  std::unique_ptr<GradAnalysis> gradAnalysis_;
 
 public:
   static CameraDataManager &GetInstance();
